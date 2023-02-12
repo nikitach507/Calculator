@@ -1,5 +1,9 @@
-import tkmacosx
+import sys
 import tkinter as tk
+from tkinter import Button
+
+if sys.platform == 'darwin':
+    from tkmacosx import Button
 
 
 class Calculator:
@@ -10,19 +14,19 @@ class Calculator:
         self.prev_solution_label = None
         self.solution_label = None
         self.squared_formula = ""
-        self.interface()
+        self.create_interface()
 
-    def interface(self):
+    def create_interface(self):
         """Creating a GUI interface for the calculator"""
 
-        # Label for showing the solution area
+        # Solution label
         self.solution_label = tk.Label(win, text=self.solution_area,
                                        bg='#292c32', anchor='se',
                                        width=18, font=("Trebuchet MS", 39),
                                        )
         self.solution_label.place(x=0, y=90)
 
-        # Label for showing the previous formula
+        # Previous solution label
         self.prev_solution_label = tk.Label(win, text=self.prev_solution_area,
                                             bg='#292c32', anchor='se',
                                             width=29, font=("Trebuchet MS", 23),
@@ -39,94 +43,139 @@ class Calculator:
         position_mb_x = 5
         position_mb_y = 180
 
-        # Creating calculator buttons
         for btn in main_buttons:
-            comm = lambda e=btn: self.logicalc(e)
-            tkmacosx.Button(win, text=btn, bg='#30343a',
-                            activebackground='#292c32',
-                            font=("Times New Roman", 18), fg='white',
-                            activeforeground='white',
-                            command=comm,
-                            ).place(x=position_mb_x, y=position_mb_y, width=70, height=79)
-
+            self.create_button(btn, position_mb_x, position_mb_y)
             position_mb_x += 80
             if position_mb_x > 400:
                 position_mb_x = 5
                 position_mb_y += 83.5
 
+    def create_button(self, btn_text, x, y):
+        """Creating calculator buttons"""
+
+        comm = lambda: self.logicalc(btn_text)
+        Button(win, text=btn_text, bg='#30343a',
+               activebackground='#292c32',
+               font=("Times New Roman", 18), fg='white',
+               activeforeground='white',
+               command=comm,
+               ).place(x=x, y=y, width=70, height=79)
+
     def logicalc(self, action):
         """Logic of button actions"""
-        overload_words = ["0", "Error", "True", "False"]
-        block_words = ["DEL",
-                       "=", "*", "/",
-                       ">", "<", "%"]
+
+        overload_words = {"0", "Error", "True", "False"}
+        block_ops = {"DEL", "=", "*", "/", ">", "<", "%"}
+        formula = self.solution_area
 
         # Clear the solution area
         if action == "C":
-            self.solution_area = "0"
+            formula = ""
+
+        # Write the equation in parentheses
+        elif action == "(":
+            if formula in overload_words:
+                formula = f"( )"
+            else:
+                formula += f"( )"
+
+        # Writing a quadratic equation
+        elif action == "X^2":
+            if formula in overload_words:
+                formula = f"( )²"
+            else:
+                formula += f"( )²"
+
+        # Writing a formula inside the equation in parentheses
+        elif formula[-1] in [")", "²"] and action not in ["=", "DEL"]:
+            formula = formula.replace(" ", "")
+
+            # Exit condition for the equation
+            if action != ")":
+                if formula[-1] == ")":
+                    formula = formula[:len(formula) - 1] + ''.join(
+                        action) + formula[(len(formula) - 1):]
+                elif formula[-1] == "²":
+                    formula = formula[:len(formula) - 2] + ''.join(action) + \
+                              formula[(len(formula) - 2):]
+                    self.squared_formula += action
+            else:
+                formula += " "
 
         # Prohibit the use of "." in repetition and overload_words(exception 0)
         elif action == ".":
-            if self.solution_area[-1] != "." and not self.solution_area in overload_words:
-                self.solution_area += action
-            elif self.solution_area == "0":
-                self.solution_area += action
-
-        # Writing a quadratic equation at the beginning and in the middle of the formula
-        elif action == "X^2":
-            if self.solution_area in overload_words:
-                self.solution_area = f"( )²"
-            else:
-                self.solution_area = self.solution_area + f"( )²"
-
-        # Writing a formula inside a quadratic equation
-        elif self.solution_area[-1] == "²" and action != "=":
-            self.solution_area = self.solution_area.replace(" ", "")
-
-            # Exit condition for the quadratic equation
-            if action != ")":
-                self.solution_area = self.solution_area[:(len(self.solution_area)-2)] + ''.join(action) + \
-                                     self.solution_area[(len(self.solution_area)-2):]
-                self.squared_formula += action
-            else:
-                self.solution_area += " "
+            if formula not in overload_words and formula[-1] != ".":
+                formula += action
+            elif formula == "0":
+                formula += action
 
         # Prohibit adding characters in certain situations
-        elif self.solution_area in overload_words:
-            if not action in block_words and action != "X^2":
-                self.solution_area = action
+        elif formula in overload_words:
+            if action not in block_ops and action != "X^2":
+                formula = action
 
         # Delete the last character
         elif action == "DEL":
-            self.solution_area = self.solution_area[0:-1]
+            # Delete the last character in parentheses
+            if formula[-1] == ")":
+                if not formula[-2] == "(":
+                    formula = formula[:len(formula)-2] + ")"
+                else:
+                    formula = formula[:len(formula)-2]
+            elif formula[-1] == "²":
+                if formula[-3] != "(":
+                    formula = formula[:len(formula)-3] + ")²"
+                    self.squared_formula = self.squared_formula[0:-1]
+                else:
+                    formula = formula[:len(formula)-3]
+            else:
+                formula = formula[0:-1]
 
         # Calculating the formula in the area
         elif action == "=":
-            saved_formula = self.solution_area
+            saved_formula = formula
             # Warning of a user error
             try:
                 # Checking for and calculating a quadratic equation
-                if "²" in self.solution_area:
+                if "²" in formula:
                     solution_squared = str(eval(self.squared_formula) ** 2)
-                    self.solution_area = self.solution_area.replace(f"({self.squared_formula})²",
-                                                                    f"{solution_squared}")
+                    formula = formula.replace(f"({self.squared_formula})²", f"{solution_squared}")
                     self.squared_formula = ""
-                self.solution_area = str(eval(self.solution_area))
-            except (SyntaxError, ZeroDivisionError, NameError, TypeError):
-                self.solution_area = "Error"
+                formula = str(eval(formula))
+            except (SyntaxError, ZeroDivisionError, NameError, TypeError) as exception:
+                error_message = f"{type(exception).__name__}: {exception}"
+                self.error_warning(error_message)
+                formula = "Error"
             # Writing down the whole equation with the answer
-            self.prev_solution_label.configure(text=f"{saved_formula} = {self.solution_area}")
+            self.prev_solution_label.configure(text=f"{saved_formula} = {formula}")
 
         # Adding characters to the area
         else:
-            if " " in self.solution_area:
-                self.solution_area = self.solution_area.replace(" ", action)
+            if " " in formula:
+                formula = formula.replace(" ", action)
             else:
-                self.solution_area += action
+                formula += action
+
+        self.solution_area = formula
         self.update()
+
+    def error_warning(self, message):
+        """Create a new window for an error"""
+
+        mistake_win = tk.Toplevel()
+        mistake_win.geometry("390x75+5+55")
+        mistake_win.title('Error message')
+        mistake_win.config(bg='#292c32')
+        tk.Label(mistake_win, text=f'{message}', bg='#FF6666',
+                 font='Arial 15 bold', fg='white', height=2
+                 ).place(relx=0.5, rely=0.5, anchor="center")
+        mistake_win.overrideredirect(True)
+        mistake_win.after(3000, lambda: mistake_win.destroy())
 
     def update(self):
         """Updating the solution area during actions"""
+        if self.solution_area == "":
+            self.solution_area = "0"
         self.solution_label.configure(text=self.solution_area)
 
 
