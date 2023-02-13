@@ -1,6 +1,7 @@
 import sys
 import tkinter as tk
 from tkinter import Button
+import re
 
 if sys.platform == 'darwin':
     from tkmacosx import Button
@@ -9,6 +10,7 @@ if sys.platform == 'darwin':
 class Calculator:
     def __init__(self):
         """Initializing variables for the calculator"""
+        self.mistake_win = None
         self.solution_area = "0"
         self.prev_solution_area = ""
         self.prev_solution_label = None
@@ -20,25 +22,25 @@ class Calculator:
         """Creating a GUI interface for the calculator"""
 
         # Solution label
-        self.solution_label = tk.Label(win, text=self.solution_area,
+        self.solution_label = tk.Label(text=self.solution_area,
                                        bg='#292c32', anchor='se',
                                        width=18, font=("Trebuchet MS", 39),
                                        )
         self.solution_label.place(x=0, y=90)
 
         # Previous solution label
-        self.prev_solution_label = tk.Label(win, text=self.prev_solution_area,
+        self.prev_solution_label = tk.Label(text=self.prev_solution_area,
                                             bg='#292c32', anchor='se',
                                             width=29, font=("Trebuchet MS", 23),
                                             )
         self.prev_solution_label.place(x=0, y=20)
 
         main_buttons = [
-            "C", "<", ">", "(", ")",
+            "CE", "<", ">", "(", ")",
             "1", "2", "3", "%", "X^2",
             "4", "5", "6", "*", "/",
             "7", "8", "9", "+", "-",
-            "log()", "0", ".", "DEL", "="
+            "", "0", ".", "DEL", "="
         ]
         position_mb_x = 5
         position_mb_y = 180
@@ -54,7 +56,7 @@ class Calculator:
         """Creating calculator buttons"""
 
         comm = lambda: self.logicalc(btn_text)
-        Button(win, text=btn_text, bg='#30343a',
+        Button(text=btn_text, bg='#30343a',
                activebackground='#292c32',
                font=("Times New Roman", 18), fg='white',
                activeforeground='white',
@@ -69,7 +71,7 @@ class Calculator:
         formula = self.solution_area
 
         # Clear the solution area
-        if action == "C":
+        if action == "CE":
             formula = ""
 
         # Write the equation in parentheses
@@ -119,15 +121,15 @@ class Calculator:
             # Delete the last character in parentheses
             if formula[-1] == ")":
                 if not formula[-2] == "(":
-                    formula = formula[:len(formula)-2] + ")"
+                    formula = formula[:len(formula) - 2] + ")"
                 else:
-                    formula = formula[:len(formula)-2]
+                    formula = formula[:len(formula) - 2]
             elif formula[-1] == "²":
                 if formula[-3] != "(":
-                    formula = formula[:len(formula)-3] + ")²"
+                    formula = formula[:len(formula) - 3] + ")²"
                     self.squared_formula = self.squared_formula[0:-1]
                 else:
-                    formula = formula[:len(formula)-3]
+                    formula = formula[:len(formula) - 3]
             else:
                 formula = formula[0:-1]
 
@@ -136,6 +138,49 @@ class Calculator:
             saved_formula = formula
             # Warning of a user error
             try:
+                # Calculating a formula with percentages
+                if "%" in formula:
+                    for count_percent in range(formula.count("%")):
+
+                        # Divide the formula into two parts and find the percentage
+                        split_formula = re.split("%", formula, 1)  # = ["15-(200-50)+10", "+40"]
+                        formula_before_percent = split_formula[0]  # = 15-(200-50)+10
+                        formula_after_percent = split_formula[1]  # = +40
+                        split_formula_before_percent = re.split(r"\D", formula_before_percent)  # = ["15", "", "200","50", "", "10"]
+                        percent = split_formula_before_percent[-1]  # = 10
+
+                        if len(split_formula_before_percent) > 1:
+                            ops_before_percentage = formula_before_percent[:-(len(percent))][-1]  # = 15-(200-50)+ -> +
+
+                            # Check for parentheses before the sign
+                            if split_formula_before_percent[-2] == "":
+                                before_last_bracketed_formula = formula_before_percent[
+                                                                0: + formula_before_percent.rfind("(")]  # = 15-
+                                after_last_bracketed_formula = formula_before_percent[
+                                                               formula_before_percent.rfind("(") + 0:]  # = (200-50)+10
+
+                                # Check round brackets or square brackets
+                                round_squared = ")²" if split_formula_before_percent[-3] == "" else ")"  # = )
+                                bracketed_formula = after_last_bracketed_formula[
+                                                    0: + after_last_bracketed_formula.find(")")] + round_squared  # = (200-50)
+
+                                formula = f"{before_last_bracketed_formula}" \
+                                          f"({bracketed_formula}{ops_before_percentage}({bracketed_formula}*{percent}/100))" \
+                                          f"{formula_after_percent}"  # = 15-((200-50)+((200-50)*10/100))+40
+                            else:
+                                # Finding a number from which we take a percentage
+                                dependent_number = split_formula_before_percent[-2]
+                                count_active_number = len(dependent_number + percent) + 1
+
+                                formula_before_dependent_number = formula_before_percent[:-count_active_number]
+
+                                formula = f"{formula_before_dependent_number}" \
+                                          f"({dependent_number}{ops_before_percentage}({dependent_number}*{percent}/100))" \
+                                          f"{formula_after_percent}"
+                        else:
+                            formula = f"({percent}/100){formula_after_percent}"
+                        count_percent += 1
+
                 # Checking for and calculating a quadratic equation
                 if "²" in formula:
                     solution_squared = str(eval(self.squared_formula) ** 2)
@@ -143,7 +188,7 @@ class Calculator:
                     self.squared_formula = ""
                 formula = str(eval(formula))
             except (SyntaxError, ZeroDivisionError, NameError, TypeError) as exception:
-                error_message = f"{type(exception).__name__}: {exception}"
+                error_message = f"{type(exception).__name__}: {exception.args[0]}"
                 self.error_warning(error_message)
                 formula = "Error"
             # Writing down the whole equation with the answer
@@ -162,15 +207,15 @@ class Calculator:
     def error_warning(self, message):
         """Create a new window for an error"""
 
-        mistake_win = tk.Toplevel()
-        mistake_win.geometry("390x75+5+55")
-        mistake_win.title('Error message')
-        mistake_win.config(bg='#292c32')
-        tk.Label(mistake_win, text=f'{message}', bg='#FF6666',
-                 font='Arial 15 bold', fg='white', height=2
+        self.mistake_win = tk.Toplevel()
+        self.mistake_win.geometry("390x75+5+55")
+        self.mistake_win.title('Error message')
+        self.mistake_win.config(bg='#292c32')
+        tk.Label(self.mistake_win, text=f'{message}', bg='#FF6666',
+                 font='Arial 15 bold', fg='white', height=2, width=40, wraplength=370
                  ).place(relx=0.5, rely=0.5, anchor="center")
-        mistake_win.overrideredirect(True)
-        mistake_win.after(3000, lambda: mistake_win.destroy())
+        self.mistake_win.overrideredirect(True)
+        self.mistake_win.after(3000, lambda: self.mistake_win.destroy())
 
     def update(self):
         """Updating the solution area during actions"""
@@ -185,7 +230,7 @@ if __name__ == "__main__":
     win_w, win_h = 400, 600
     win.title("Calculator")
     win.geometry(f"{win_w}x{win_h}+0+10")
-    logo = tk.PhotoImage(file='img/l_cal.png')
+    logo = tk.PhotoImage(file='img/calculator_icon.png')
     win.iconphoto(False, logo)
     win.config(bg='#292c32')
     win.resizable(False, False)
