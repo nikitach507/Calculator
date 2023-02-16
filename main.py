@@ -1,7 +1,7 @@
+import ast
 import sys
 import tkinter as tk
 from tkinter import Button
-import re
 
 if sys.platform == 'darwin':
     from tkmacosx import Button
@@ -100,8 +100,12 @@ class Calculator:
                 elif formula[-1] == "²":
                     formula = formula[:len(formula) - 2] + ''.join(action) + \
                               formula[(len(formula) - 2):]
-                    self.squared_formula += action
+                    if action == "%":
+                        self.squared_formula = "/100"
+                    else:
+                        self.squared_formula += action
             else:
+                self.squared_formula += "|"
                 formula += " "
 
         # Prohibit the use of "." in repetition and overload_words(exception 0)
@@ -140,53 +144,16 @@ class Calculator:
             try:
                 # Calculating a formula with percentages
                 if "%" in formula:
-                    for count_percent in range(formula.count("%")):
-
-                        # Divide the formula into two parts and find the percentage
-                        split_formula = re.split("%", formula, 1)  # = ["15-(200-50)+10", "+40"]
-                        formula_before_percent = split_formula[0]  # = 15-(200-50)+10
-                        formula_after_percent = split_formula[1]  # = +40
-                        split_formula_before_percent = re.split(r"\D", formula_before_percent)  # = ["15", "", "200","50", "", "10"]
-                        percent = split_formula_before_percent[-1]  # = 10
-
-                        if len(split_formula_before_percent) > 1:
-                            ops_before_percentage = formula_before_percent[:-(len(percent))][-1]  # = 15-(200-50)+ -> +
-
-                            # Check for parentheses before the sign
-                            if split_formula_before_percent[-2] == "":
-                                before_last_bracketed_formula = formula_before_percent[
-                                                                0: + formula_before_percent.rfind("(")]  # = 15-
-                                after_last_bracketed_formula = formula_before_percent[
-                                                               formula_before_percent.rfind("(") + 0:]  # = (200-50)+10
-
-                                # Check round brackets or square brackets
-                                round_squared = ")²" if split_formula_before_percent[-3] == "" else ")"  # = )
-                                bracketed_formula = after_last_bracketed_formula[
-                                                    0: + after_last_bracketed_formula.find(")")] + round_squared  # = (200-50)
-
-                                formula = f"{before_last_bracketed_formula}" \
-                                          f"({bracketed_formula}{ops_before_percentage}({bracketed_formula}*{percent}/100))" \
-                                          f"{formula_after_percent}"  # = 15-((200-50)+((200-50)*10/100))+40
-                            else:
-                                # Finding a number from which we take a percentage
-                                dependent_number = split_formula_before_percent[-2]
-                                count_active_number = len(dependent_number + percent) + 1
-
-                                formula_before_dependent_number = formula_before_percent[:-count_active_number]
-
-                                formula = f"{formula_before_dependent_number}" \
-                                          f"({dependent_number}{ops_before_percentage}({dependent_number}*{percent}/100))" \
-                                          f"{formula_after_percent}"
-                        else:
-                            formula = f"({percent}/100){formula_after_percent}"
-                        count_percent += 1
-
+                    formula = formula.replace("%", "/100")
                 # Checking for and calculating a quadratic equation
                 if "²" in formula:
-                    solution_squared = str(eval(self.squared_formula) ** 2)
-                    formula = formula.replace(f"({self.squared_formula})²", f"{solution_squared}")
+                    count_squared_parentheses = formula.count("²")
+                    self.squared_formula = self.squared_formula.split("|")
+                    for count in range(count_squared_parentheses):
+                        solution_squared = str(eval(self.squared_formula[count]) ** 2)
+                        formula = formula.replace(f"({self.squared_formula[count]})²", f"{solution_squared}")
                     self.squared_formula = ""
-                formula = str(eval(formula))
+                formula = str(ast.literal_eval(formula))
             except (SyntaxError, ZeroDivisionError, NameError, TypeError) as exception:
                 error_message = f"{type(exception).__name__}: {exception.args[0]}"
                 self.error_warning(error_message)

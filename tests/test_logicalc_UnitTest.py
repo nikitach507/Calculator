@@ -55,7 +55,7 @@ class Test_Calculator_Logicalc(unittest.TestCase):
         self.assertEqual(self.calculator.solution_area, "9+(2-4)² ")
 
     def test_logicalc_percent(self):
-        self.calculator.solution_area = "15-((200-50)+((200-50)*10/100))+40"
+        self.calculator.solution_area = "12+3-6%-(4+3)"
         self.calculator.logicalc("=")
         self.assertEqual(self.calculator.solution_area, "121.0")
 
