@@ -104,8 +104,10 @@ class Calculator:
                         self.squared_formula = "/100"
                     else:
                         self.squared_formula += action
-            else:
+            elif formula[-1] == "²":
                 self.squared_formula += "|"
+                formula += " "
+            else:
                 formula += " "
 
         # Prohibit the use of "." in repetition and overload_words(exception 0)
@@ -153,11 +155,12 @@ class Calculator:
                         solution_squared = str(eval(self.squared_formula[count]) ** 2)
                         formula = formula.replace(f"({self.squared_formula[count]})²", f"{solution_squared}")
                     self.squared_formula = ""
-                formula = str(ast.literal_eval(formula))
+                formula = str(eval(formula))
             except (SyntaxError, ZeroDivisionError, NameError, TypeError) as exception:
                 error_message = f"{type(exception).__name__}: {exception.args[0]}"
                 self.error_warning(error_message)
                 formula = "Error"
+            self.squared_formula = ""
             # Writing down the whole equation with the answer
             self.prev_solution_label.configure(text=f"{saved_formula} = {formula}")
 
