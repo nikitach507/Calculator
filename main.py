@@ -10,7 +10,7 @@ if sys.platform == 'darwin':
 class Calculator:
     def __init__(self):
         """Initializing variables for the calculator"""
-        self.mistake_win = None
+        self.error_window = None
         self.solution_area = "0"
         self.prev_solution_area = ""
         self.prev_solution_label = None
@@ -52,11 +52,11 @@ class Calculator:
                 position_mb_x = 5
                 position_mb_y += 83.5
 
-    def create_button(self, btn_text, x, y):
+    def create_button(self, btn_symbol, x, y):
         """Creating calculator buttons"""
 
-        comm = lambda: self.logicalc(btn_text)
-        Button(text=btn_text, bg='#30343a',
+        comm = lambda: self.logicalc(btn_symbol)
+        Button(text=btn_symbol, bg='#30343a',
                activebackground='#292c32',
                font=("Times New Roman", 18), fg='white',
                activeforeground='white',
@@ -65,7 +65,6 @@ class Calculator:
 
     def logicalc(self, action):
         """Logic of button actions"""
-
         overload_words = {"0", "Error", "True", "False"}
         block_ops = {"DEL", "=", "*", "/", ">", "<", "%"}
         formula = self.solution_area
@@ -74,95 +73,30 @@ class Calculator:
         if action == "CE":
             formula = ""
 
+        # Checking the area of the formula
+        elif formula in overload_words:
+            formula = self.check_formula_area(action, formula, block_ops)
+
         # Write the equation in parentheses
         elif action == "(":
-            if formula in overload_words:
-                formula = f"( )"
-            else:
-                formula += f"( )"
+            formula += f"( )"
 
         # Writing a quadratic equation
         elif action == "X^2":
-            if formula in overload_words:
-                formula = f"( )²"
-            else:
-                formula += f"( )²"
+            formula += f"( )²"
 
         # Writing a formula inside the equation in parentheses
         elif formula[-1] in [")", "²"] and action not in ["=", "DEL"]:
-            formula = formula.replace(" ", "")
-
-            # Exit condition for the equation
-            if action != ")":
-                if formula[-1] == ")":
-                    formula = formula[:len(formula) - 1] + ''.join(
-                        action) + formula[(len(formula) - 1):]
-                elif formula[-1] == "²":
-                    formula = formula[:len(formula) - 2] + ''.join(action) + \
-                              formula[(len(formula) - 2):]
-                    if action == "%":
-                        self.squared_formula = "/100"
-                    else:
-                        self.squared_formula += action
-            elif formula[-1] == "²":
-                self.squared_formula += "|"
-                formula += " "
-            else:
-                formula += " "
-
-        # Prohibit the use of "." in repetition and overload_words(exception 0)
-        elif action == ".":
-            if formula not in overload_words and formula[-1] != ".":
-                formula += action
-            elif formula == "0":
-                formula += action
-
-        # Prohibit adding characters in certain situations
-        elif formula in overload_words:
-            if action not in block_ops and action != "X^2":
-                formula = action
+            formula = self.bracketed_action(formula, action)
 
         # Delete the last character
         elif action == "DEL":
             # Delete the last character in parentheses
-            if formula[-1] == ")":
-                if not formula[-2] == "(":
-                    formula = formula[:len(formula) - 2] + ")"
-                else:
-                    formula = formula[:len(formula) - 2]
-            elif formula[-1] == "²":
-                if formula[-3] != "(":
-                    formula = formula[:len(formula) - 3] + ")²"
-                    self.squared_formula = self.squared_formula[0:-1]
-                else:
-                    formula = formula[:len(formula) - 3]
-            else:
-                formula = formula[0:-1]
+            formula = self.delete_action(formula)
 
         # Calculating the formula in the area
         elif action == "=":
-            saved_formula = formula
-            # Warning of a user error
-            try:
-                # Calculating a formula with percentages
-                if "%" in formula:
-                    formula = formula.replace("%", "/100")
-                # Checking for and calculating a quadratic equation
-                if "²" in formula:
-                    count_squared_parentheses = formula.count("²")
-                    self.squared_formula = self.squared_formula.split("|")
-                    for count in range(count_squared_parentheses):
-                        solution_squared = str(eval(self.squared_formula[count]) ** 2)
-                        formula = formula.replace(f"({self.squared_formula[count]})²", f"{solution_squared}")
-                    self.squared_formula = ""
-                formula = str(eval(formula))
-            except (SyntaxError, ZeroDivisionError, NameError, TypeError) as exception:
-                error_message = f"{type(exception).__name__}: {exception.args[0]}"
-                self.error_warning(error_message)
-                formula = "Error"
-            self.squared_formula = ""
-            # Writing down the whole equation with the answer
-            self.prev_solution_label.configure(text=f"{saved_formula} = {formula}")
+            formula = self.equals_action(formula)
 
         # Adding characters to the area
         else:
@@ -174,18 +108,93 @@ class Calculator:
         self.solution_area = formula
         self.update()
 
+    @staticmethod
+    def check_formula_area(action, formula, block_ops):
+        if action not in block_ops:
+            if formula == "0" and action == ".":
+                formula += action
+            elif action == "(":
+                formula = f"( )"
+            elif action == "X^2":
+                formula = f"( )²"
+            else:
+                formula = action
+        return formula
+
+    def bracketed_action(self, formula, action):
+        formula = formula.replace(" ", "")
+
+        # Exit condition for the equation
+        if action != ")":
+            if formula[-1] == ")":
+                formula = formula[:len(formula) - 1] + ''.join(
+                    action) + formula[(len(formula) - 1):]
+            elif formula[-1] == "²":
+                formula = formula[:len(formula) - 2] + ''.join(action) + \
+                          formula[(len(formula) - 2):]
+                if action == "%":
+                    self.squared_formula = "/100"
+                else:
+                    self.squared_formula += action
+        elif formula[-1] == "²":
+            self.squared_formula += "|"
+            formula += " "
+        else:
+            formula += " "
+        return formula
+
+    def delete_action(self, formula):
+        if formula[-1] == ")":
+            if not formula[-2] == "(":
+                formula = formula[:len(formula) - 2] + ")"
+            else:
+                formula = formula[:len(formula) - 2]
+        elif formula[-1] == "²":
+            if formula[-3] != "(":
+                formula = formula[:len(formula) - 3] + ")²"
+                self.squared_formula = self.squared_formula[0:-1]
+            else:
+                formula = formula[:len(formula) - 3]
+        else:
+            formula = formula[0:-1]
+        return formula
+
+    def equals_action(self, formula):
+        saved_formula = formula
+        # Warning of a user error
+        try:
+            # Calculating a formula with percentages
+            if "%" in formula:
+                formula = formula.replace("%", "/100")
+            # Checking for and calculating a quadratic equation
+            if "²" in formula:
+                count_squared_parentheses = formula.count("²")
+                self.squared_formula = self.squared_formula.split("|")
+                for count in range(count_squared_parentheses):
+                    solution_squared = str(eval(self.squared_formula[count]) ** 2)
+                    formula = formula.replace(f"({self.squared_formula[count]})²", f"{solution_squared}")
+                self.squared_formula = ""
+            formula = str(eval(formula))
+        except (SyntaxError, ZeroDivisionError, NameError, TypeError) as exception:
+            error_message = f"{type(exception).__name__}: {exception.args[0]}"
+            self.error_warning(error_message)
+            formula = "Error"
+        self.squared_formula = ""
+        # Writing down the whole equation with the answer
+        self.prev_solution_label.configure(text=f"{saved_formula} = {formula}")
+        return formula
+
     def error_warning(self, message):
         """Create a new window for an error"""
-
-        self.mistake_win = tk.Toplevel()
-        self.mistake_win.geometry("390x75+5+55")
-        self.mistake_win.title('Error message')
-        self.mistake_win.config(bg='#292c32')
-        tk.Label(self.mistake_win, text=f'{message}', bg='#FF6666',
+        self.error_window = tk.Toplevel()
+        self.error_window.geometry("390x75+5+55")
+        self.error_window.title('Error message')
+        self.error_window.config(bg='#292c32')
+        tk.Label(self.error_window, text=f'{message}', bg='#FF6666',
                  font='Arial 15 bold', fg='white', height=2, width=40, wraplength=370
                  ).place(relx=0.5, rely=0.5, anchor="center")
-        self.mistake_win.overrideredirect(True)
-        self.mistake_win.after(3000, lambda: self.mistake_win.destroy())
+        self.error_window.overrideredirect(True)
+        self.error_window.after(3000, lambda: self.error_window.destroy())
 
     def update(self):
         """Updating the solution area during actions"""
@@ -200,8 +209,6 @@ if __name__ == "__main__":
     win_w, win_h = 400, 600
     win.title("Calculator")
     win.geometry(f"{win_w}x{win_h}+0+10")
-    logo = tk.PhotoImage(file='img/calculator_icon.png')
-    win.iconphoto(False, logo)
     win.config(bg='#292c32')
     win.resizable(False, False)
     tk.Label(win, bg='#30343a',
